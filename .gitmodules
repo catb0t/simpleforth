@@ -1,0 +1,6 @@
+[submodule "pmlr"]
+	path = pmlr
+	url = https://github.com/catb0t/pmlr
+[submodule "docopt"]
+	path = docopt
+	url = https://github.com/docopt/docopt
