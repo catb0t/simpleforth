@@ -146,6 +146,10 @@ class OpCore():
     def urot(self, idx=-1, count=3):
         """( w x y z -- z w x y )
         rotate things right, at an index"""
+        l = [self.pop(idx=idx)] * count
+        l.append(l.pop(0))
+        self.push(*l, idx=idx)
+
 
 class OpMath():
     pass
