@@ -4,3 +4,6 @@
 [submodule "docopt"]
 	path = docopt
 	url = https://github.com/docopt/docopt
+[submodule "fuzzy_grep"]
+	path = fuzzy_grep
+	url = https://github.com/catb0t/fuzzy_grep

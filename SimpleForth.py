@@ -54,22 +54,29 @@ def interpret(args):
                 i for i in " ".join(colexpr.split(" ")).split(" ")
                 if i != ""
             ]
+
             # words need names
-            if not defn: print("can't compile empty NOP word without a name\n"); continue
+            if not defn:
+                print("can't compile empty NOP word without a name\n");
+                continue
+
             # empty words are ok, as long as they're named
-            elif len(defn) == 1: name, rst = defn[0], "NOP"
+            elif len(defn) == 1:
+                name, rst = defn[0], "NOP"
+
             # normal, defined words
-            else: name, rst = " ".join(defn[1:]), defn[0]
+            else:
+                name, rst = " ".join(defn[1:]), defn[0]
 
             print(
                 " {0} -> \n\t{1}\n compile new word {0} ? (y/N) "
                 .format(name, rst)
             )
 
-            if pmlr.readkey().lower() in ("y", "\n", " "):
+            if pmlr.readkey(raw=True).lower() in ("y", "\n", " "):
 
                 err = fth.define(name, rst)
-                for i in "compiling...":
+                for i in "compiling... ":
                     sleep(.06)
                     print(i)
 
@@ -81,10 +88,10 @@ def interpret(args):
                 else:
                     print("done!")
             else:
-                print("\n word not compiled.")
+                print("word not compiled.")
 
         else:
-            print("\x1b[1A\x1b[50C\x1b[1;34mINTERPRET\x1b[59D\x1b[1B\x1b[0m")
+            print("\x1b[1A\x1b[50C\x1b[1;32mINTERPRET\x1b[59D\x1b[1B\x1b[0m")
             prog = f + pmlr.until("\n")
             #print("\n" + prog)
             fth.run(prog)
