@@ -57,7 +57,8 @@ class TestCoreOps(unittest.TestCase):
 
     def test_pop_multi(self):
         self.stk.push(1, 2, 3, 4)
-        s = self.stk.pop()
+        s = self.stk.pop(55)
+        self.assertEqual(s, [1, 2, 3, 1, 2, 3, 4])
 
     def test_clear(self):
         self.stk.clear()
@@ -74,7 +75,6 @@ class TestCoreOps(unittest.TestCase):
     def test_pick_range(self):
         self.assertEqual(self.stk.pick(lower=1), [2, 3])
 
-    def
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

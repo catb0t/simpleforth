@@ -6,9 +6,10 @@ from pmlr import pmlr
 
 debug_write = pmlr.util.debug_write
 
-IS_FATAL = {
+ERR_DATA = {
     ZeroDivisionError:  {"IS_FATAL": False, "TYPE": "DEBUG"},
     LookupError:        {"IS_FATAL": False, "TYPE": "RANGE"},
+    IndexError:         {"IS_FATAL": False, "TYPE": "RANGE"},
     TypeError:          {"IS_FATAL": True,  "TYPE": "ERROR"},
     NameError:          {"IS_FATAL": True,  "TYPE": "FATAL"},
     ValueError:         {"IS_FATAL": True,  "TYPE": "FATAL"},
@@ -71,7 +72,7 @@ class OpCore():
         take something and return it"""
         if count > len(self._stk):
             pmlr.util.debug_write(
-                "popping more items than exist on stack!",
+                "popping more items than exist on stack!\n",
                 level="WARN"
             )
 
@@ -95,7 +96,8 @@ class OpCore():
                 except LookupError as err:
                     self.err(err, errtype="RANGE")
                     break
-        return x
+
+        return x[0] if len(x) == 1 else x
 
     def push(self, *args, idx=-1):
         """( -- x ... )
@@ -104,7 +106,6 @@ class OpCore():
             self._stk.extend(args)
         else:
             [self._stk.insert(idx, arg) for arg in args]
-
 
     def clear(self):
         """( z y x -- )
@@ -148,7 +149,7 @@ class OpCore():
                 raise
                 return None
             else:
-                return s
+                return s[0] if len(s) == 1 else s
 
     def drop(self, count=1, idx=-1):
         """( x -- )
@@ -215,13 +216,17 @@ class Stack(OpCore, OpLogik, OpString):
     def __init__(self):
         self._stk = []
 
-    def err(self, err, errtype=None):
+    def err(self, err, errtype=None, framelevel=3):
         if errtype is None:
             errtype = ERR_DATA.get(err.__class__, {"TYPE": "FATAL"})["TYPE"]
 
         errtype = errtype.upper()
 
-        debug_write(*err.args, "\n", level=errtype)
+        debug_write(*err.args, "\n", level=errtype, framelevel=framelevel)
 
         if ERR_DATA.get(err.__class__, {"IS_FATAL": True})["IS_FATAL"]:
-            raise err.__class__(pmlr.debug_fmt(errtype) + " :: ".join(*err.args))
+            raise err.__class__(
+                pmlr.util.debug_fmt(
+                    errtype, framelevel=framelevel
+                ) + " " + "".join(*err.args)
+            )
