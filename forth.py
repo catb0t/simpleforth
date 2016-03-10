@@ -1,44 +1,49 @@
 #!/usr/bin/env python3
 
+import builtins
+
 from pmlr import pmlr
 
 debug_write = pmlr.util.debug_write
 
 IS_FATAL = {
     ZeroDivisionError:  {"IS_FATAL": False, "TYPE": "DEBUG"},
-    IndexError:         {"IS_FATAL": False, "TYPE": "RANGE"},
+    LookupError:        {"IS_FATAL": False, "TYPE": "RANGE"},
+    TypeError:          {"IS_FATAL": True,  "TYPE": "ERROR"},
     NameError:          {"IS_FATAL": True,  "TYPE": "FATAL"},
-    TypeError:          {"IS_FATAL": True,  "TYPE": "FATAL"},
     ValueError:         {"IS_FATAL": True,  "TYPE": "FATAL"},
+    AssertionError:     {"IS_FATAL": True,  "TYPE": "FATAL"},
 }
 
 
 def is_none(*args):
-    return True if None in args else False
+    return None in args
 
 
-class MalformedExpressionException(Warning):
+def cmp_all(val, *tests):
+    return builtins.all([val == test for test in tests])
 
-    def __init__(self, *msg, level="INFO"):
-        self.msg = msg
-        self.level = level
 
-    def __str__(self):
-        return msg
+def all(*args):
+    return builtins.all(args)
 
-    def __repr__(self):
-        return self.__str__()
+
+def any(*args):
+    return builtins.any(args)
+
 
 class Forth(object):
 
     def __init__(self):
-        self._stack  = Stack()
-        self._lopstk = Stack()
-        self._retstk = Stack()
-        self._sftstk = Stack()
+        (self._stk, self._lopstk,
+            self._retstk, self._sftstk) = [Stack() for i in range(4)]
 
         self.dict = {
-            "dup": (self._stack.dup, ())
+            "": ()
+        }
+
+        self.funcdict = {
+            "": ()
         }
 
     def run(self, prog, sandbox=False):
@@ -56,27 +61,44 @@ class Forth(object):
 
 class OpCore():
 
-    """bare stackman ops"""
+    """bare stack operator mixin"""
+
+    def peek(self, from_idx=0, to_idx=-1):
+        return self._stk[:]
 
     def pop(self, count=1, idx=-1):
         """( x -- )
         take something and return it"""
-        try:
-            # http://stackoverflow.com/a/34633242/4532996
-            # pop(x) is slower than pop()
-            # pop(-1) doesn't seem to be optimised to pop(),
-            # so avoid it if possible
-            if idx == -1:
-                return [self._stk.pop()] * count
-            else:
-                return [self._stk.pop(idx)] * count
+        if count > len(self._stk):
+            pmlr.util.debug_write(
+                "popping more items than exist on stack!",
+                level="WARN"
+            )
 
-        except IndexError as err:
-            self.dbg_range(err)
-            return None
+        # http://stackoverflow.com/a/34633242/4532996
+        # pop(x) is slower than pop()
+        # pop(-1) doesn't seem to be optimised to pop(),
+        # so avoid it if possible
+
+        x = []
+        if -1 == idx:
+            for i in range(count):
+                try:
+                    x.append(self._stk.pop())
+                except LookupError as err:
+                    self.err(err, errtype="RANGE")
+                    break
+        else:
+            for i in range(count):
+                try:
+                    x.append(self._stk.pop(idx))
+                except LookupError as err:
+                    self.err(err, errtype="RANGE")
+                    break
+        return x
 
     def push(self, *args, idx=-1):
-        """( -- x )
+        """( -- x ... )
         put somethings at idx"""
         if idx == -1:
             self._stk.extend(args)
@@ -91,27 +113,55 @@ class OpCore():
         self._stk.clear()
         return y
 
-    def pick(self, idx=-1, upper_idx=-1):
-        """( z y x -- z x )
+    def pick(self, lower=-1, upper=-1):
+        """( x -- x )
         pick somethings from a range of indicies"""
-        try:
-            return self._stk[idx:upper_idx]
-        except IndexError as err:
-            self.dbg_range(err)
-            return None
+
+        if cmp_all(-1, lower, upper) or all(lower == -1, upper == 0):
+            return self._stk[-1]
+
+        # "string"[0:-1] == "strin"
+        elif all(lower == 0, upper == -1):
+            return self._stk[:]
+
+        elif upper == -1:
+            return self._stk[lower:]
+
+        else:
+            try:
+                s = self._stk[lower:upper]
+                assert bool(s) == bool(self._stk), \
+                    (
+                        pmlr.util.debug_fmt("FATAL")
+                        + " pick returned result inconsistent with stack state"
+                    )
+
+            # special cases of these exceptions: we want to rethrow
+            # because they should be exceptional circumstances
+            except LookupError as err:
+                self.err(err, errtype="RANGE")
+                raise
+                return None
+
+            except AssertionError as err:
+                self.err(err, errtype="FATAL")
+                raise
+                return None
+            else:
+                return s
 
     def drop(self, count=1, idx=-1):
         """( x -- )
         drop items without returning (cheaper pop)"""
-        [self.pop(idx=idx)] * count
+        [self.pop(idx=idx) for i in range(count)]
 
     def dup(self, count=1, from_idx=-1):
         """( y -- y y )
         duplicate something and push"""
         try:
             y = self._stk[from_idx] * count
-        except IndexError as err:
-            self.dbg_range(err)
+        except LookupError as err:
+            self.err(err, errtype="RANGE")
 
         self.push(*y, idx=idx)
 
@@ -122,11 +172,11 @@ class OpCore():
         for i in range(count):
             try:
                 y.append(self._stk[idx - i])
-            except IndexError as err:
+            except LookupError as err:
                 if idx == 1:
                     continue
                 else:
-                    self.dbg_range(err)
+                    self.err(err, errtype="RANGE")
                     return None
 
         self._stk.extend(y)
@@ -134,32 +184,33 @@ class OpCore():
     def swap(self, idx=-1):
         """( x y -- y x )
         swap two things at an index"""
-        self.push(*reversed([self.pop(idx=idx)] * 2), idx=idx)
+        self.push(*reversed([self.pop(idx=idx) for i in range(2)]), idx=idx)
 
     def rot(self, idx=-1, count=3):
         """( w x y z -- x y z w )
         rotate things left, at an index"""
-        l = [self.pop(idx=idx)] * count
+        l = [self.pop(idx=idx) for i in range(count)]
         l.insert(0, l.pop())
         self.push(*l, idx=idx)
 
     def urot(self, idx=-1, count=3):
         """( w x y z -- z w x y )
         rotate things right, at an index"""
-        l = [self.pop(idx=idx)] * count
+        l = [self.pop(idx=idx) for i in range(count)]
         l.append(l.pop(0))
         self.push(*l, idx=idx)
 
 
-class OpMath():
+class OpLogik():
     pass
-
 
 class OpString():
     pass
 
 
-class Stack(OpCore, OpMath, OpString):
+class Stack(OpCore, OpLogik, OpString):
+
+    "the mixin mixer of the above mixins"
 
     def __init__(self):
         self._stk = []
