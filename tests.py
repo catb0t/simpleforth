@@ -75,15 +75,12 @@ class TestCoreOps(unittest.TestCase):
     def test_pick_range(self):
         self.assertEqual(self.stk.pick(lower=1), [2, 3])
 
-
 def suiteFactory(*testcases):
 
-    cmp   = lambda x, y: x - y
     ln    = lambda f: getattr(tc, f).__code__.co_firstlineno
-    lncmp = lambda a, b: cmp(ln(a), ln(b))
+    lncmp = lambda a, b: ln(a) - ln(b)
 
     for tc in testcases:
-
         test_suite = unittest.TestSuite()
         test_suite.addTest(unittest.makeSuite(tc, sortUsing=lncmp))
 
