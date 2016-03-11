@@ -75,16 +75,17 @@ class TestCoreOps(unittest.TestCase):
     def test_pick_range(self):
         self.assertEqual(self.stk.pick(lower=1), [2, 3])
 
+
 def suiteFactory(*testcases):
 
     ln    = lambda f: getattr(tc, f).__code__.co_firstlineno
     lncmp = lambda a, b: ln(a) - ln(b)
 
+    test_suite = unittest.TestSuite()
     for tc in testcases:
-        test_suite = unittest.TestSuite()
         test_suite.addTest(unittest.makeSuite(tc, sortUsing=lncmp))
 
-        yield test_suite
+    return test_suite
 
 def caseFactory():
 
@@ -104,7 +105,7 @@ def caseFactory():
 
 if __name__ == '__main__':
 
-    for case in suiteFactory(*caseFactory()):
-        runner = unittest.TextTestRunner(verbosity=2)
-        runner.run(case)
+    cases = suiteFactory(*caseFactory())
+    runner = unittest.TextTestRunner(verbosity=2, failfast=False)
+    runner.run(cases)
 
