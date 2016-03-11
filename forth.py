@@ -97,7 +97,7 @@ class OpCore():
                     self.err(err, errtype="RANGE")
                     break
 
-        return x[0] if len(x) == 1 else x
+        return x[0] if len(x) == 1 else list(reversed(x))
 
     def push(self, *args, idx=-1):
         """( -- x ... )
@@ -105,7 +105,15 @@ class OpCore():
         if idx == -1:
             self._stk.extend(args)
         else:
-            [self._stk.insert(idx, arg) for arg in args]
+            if idx < 0:
+                for arg in args:
+                    self._stk.insert(idx, arg)
+                    idx -= 1
+
+            else:
+                for arg in args:
+                    self._stk.insert(idx, arg)
+                    idx += 1
 
     def clear(self):
         """( z y x -- )
