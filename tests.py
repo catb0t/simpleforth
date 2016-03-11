@@ -76,36 +76,52 @@ class TestCoreOps(unittest.TestCase):
         self.assertEqual(self.stk.pick(lower=1), [2, 3])
 
 
-def suiteFactory(*testcases):
 
-    ln    = lambda f: getattr(tc, f).__code__.co_firstlineno
-    lncmp = lambda a, b: ln(a) - ln(b)
+def suiteFactory(
+        *testcases,
+        sortTestsUsing = None,
+        suiteMaker     = unittest.makeSuite,
+        newTestSuite   = unittest.TestSuite
+        generator      = False
+    ):
 
-    test_suite = unittest.TestSuite()
-    for tc in testcases:
-        test_suite.addTest(unittest.makeSuite(tc, sortUsing=lncmp))
+    if sortTestsUsing is None:
+        ln             = lambda f:    getattr(tc, f).__code__.co_firstlineno
+        sortTestsUsing = lambda a, b: ln(a) - ln(b)
 
-    return test_suite
+    if not generator:
+        test_suite = newTestSuite()
 
-def caseFactory():
+        for tc in testcases:
+            test_suite.addTest(suiteMaker(tc, sortUsing=sortTestsUsing))
 
-    from inspect import findsource
+        return test_suite
 
-    g = globals().copy()
+    else:
+        for tc in testcases:
+            test_suite = newTestSuite()
+            test_suite.addTest(suiteMaker(tc, sortUsing=sortTestsUsing))
+            yield test_suite
+
+def caseFactory(
+        scope          = globals().copy(),
+        caseStartsWith = "Test",
+        caseSuperCls   = unittest.TestCase,
+        sortCasesUsing = lambda f: __import__("inspect").findsource(f)[1]
+    ):
 
     cases = [
-        g[obj] for obj in g
-            if obj.startswith("Test")
-            and issubclass(g[obj], unittest.TestCase)
+        scope[obj] for obj in scope
+            if obj.startswith(caseStartsWith)
+            and issubclass(scope[obj], caseSuperCls)
     ]
 
-    ordered_cases = sorted(cases, key=lambda f: findsource(f)[1])
+    ordered_cases = sorted(cases, key=sortCasesUsing)
 
     return ordered_cases
 
 if __name__ == '__main__':
 
     cases = suiteFactory(*caseFactory())
-    runner = unittest.TextTestRunner(verbosity=2, failfast=False)
+    runner = unittest.TextTestRunner(verbosity=2)
     runner.run(cases)
-
