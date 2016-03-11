@@ -76,6 +76,38 @@ class TestCoreOps(unittest.TestCase):
         self.assertEqual(self.stk.pick(lower=1), [2, 3])
 
 
+def suiteFactory(*testcases):
+
+    cmp   = lambda x, y: x - y
+    ln    = lambda f: getattr(tc, f).__code__.co_firstlineno
+    lncmp = lambda a, b: cmp(ln(a), ln(b))
+
+    for tc in testcases:
+
+        test_suite = unittest.TestSuite()
+        test_suite.addTest(unittest.makeSuite(tc, sortUsing=lncmp))
+
+        yield test_suite
+
+def caseFactory():
+
+    from inspect import findsource
+
+    g = globals().copy()
+
+    cases = [
+        g[obj] for obj in g
+            if obj.startswith("Test")
+            and issubclass(g[obj], unittest.TestCase)
+    ]
+
+    ordered_cases = sorted(cases, key=lambda f: findsource(f)[1])
+
+    return ordered_cases
+
 if __name__ == '__main__':
-    unittest.main(verbosity=2)
+
+    for case in suiteFactory(*caseFactory()):
+        runner = unittest.TextTestRunner(verbosity=2)
+        runner.run(case)
 

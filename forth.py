@@ -77,7 +77,7 @@ class OpCore():
             )
 
         # http://stackoverflow.com/a/34633242/4532996
-        # pop(x) is slower than pop()
+        # from testing it seems that pop(x) is slower than pop()
         # pop(-1) doesn't seem to be optimised to pop(),
         # so avoid it if possible
 
