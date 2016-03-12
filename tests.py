@@ -97,7 +97,7 @@ class TestCoreOps(unittest.TestCase):
         self.assertEqual(self.stk.pick(lower=1), [2, 3])
 
     #def test_pick_range_upper(self):
-        
+
 
 if __name__ == '__main__':
 

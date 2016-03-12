@@ -124,7 +124,7 @@ class OpCore():
 
     def _pick_deduplicator(self, execStrings, drop=False):
 
-        code = "global LASTPICK; LASTPICK = self._stk{}\nif drop: self._stk{}"\
+        code = "self._LASTPICK = self._stk{}\nif drop: self._stk{}"\
         .format(*execStrings)
 
         try:
@@ -132,25 +132,15 @@ class OpCore():
 
         # special cases of these exceptions: we want to rethrow
         # because they should be exceptional circumstances
-        except LookupError as err:
-            self.err(err, errtype="RANGE")
-            raise; return None
-
-        except AssertionError as err:
-            self.err(err, errtype="FATAL")
-            raise; return None
-
         except BaseException as err:
-            self.err(err, errtype="EXECFORMATERR")
-            raise; return None
-
-        else:
-            try:
-                return LASTPICK
-            except NameError as err:
-                self.err(err, errtype="IDENT_EXEC_ENOENT")
-                raise err
-
+            self.err(
+                err,
+                errtype = {
+                    LookupError: "RANGE",
+                    AssertionError: "FATAL"
+                }.get(err.__class__, "EXECFORMATERR")
+            )
+            raise
 
     def pick(self, lower=-1, upper=-1, drop=False):
         """( x -- x )
@@ -177,10 +167,10 @@ class OpCore():
 
         code = [c.format(lower=lower, upper=upper) for c in code]
 
-        res = self._pick_deduplicator(code, drop=drop)
+        self._pick_deduplicator(code, drop=drop)
 
         try:
-            return res
+            return self._LASTPICK
         except IndexError as err:
             self.err(err, errtype="RANGE")
             raise
@@ -214,7 +204,7 @@ class OpCore():
                     self.err(err, errtype="RANGE")
                     return None
 
-        self._stk.extend(y)
+        self.push(*y, idx=idx)
 
     def swap(self, idx=-1):
         """( x y -- y x )
