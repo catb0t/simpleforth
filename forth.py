@@ -122,42 +122,68 @@ class OpCore():
         self._stk.clear()
         return y
 
-    def pick(self, lower=-1, upper=-1):
+    def _pick_deduplicator(self, execStrings, drop=False):
+
+        code = "global LASTPICK; LASTPICK = self._stk{}\nif drop: self._stk{}"\
+        .format(*execStrings)
+
+        try:
+            exec(code, globals(), locals())
+
+        # special cases of these exceptions: we want to rethrow
+        # because they should be exceptional circumstances
+        except LookupError as err:
+            self.err(err, errtype="RANGE")
+            raise; return None
+
+        except AssertionError as err:
+            self.err(err, errtype="FATAL")
+            raise; return None
+
+        except BaseException as err:
+            self.err(err, errtype="EXECFORMATERR")
+            raise; return None
+
+        else:
+            try:
+                return LASTPICK
+            except NameError as err:
+                self.err(err, errtype="IDENT_EXEC_ENOENT")
+                raise err
+
+
+    def pick(self, lower=-1, upper=-1, drop=False):
         """( x -- x )
         pick somethings from a range of indicies"""
 
         if cmp_all(-1, lower, upper) or all(lower == -1, upper == 0):
-            return self._stk[-1]
+            code = ["[-1]", "[-1:] = []"]
 
         # "string"[0:-1] == "strin"
         elif all(lower == 0, upper == -1):
-            return self._stk[:]
+            code = ["[:]", " = []"]
 
         elif upper == -1:
-            return self._stk[lower:]
+            code = ["[{lower}:]", "[{lower}:] = []"]
+
+        elif lower == 0:
+            code = ["[:{upper}]", "[:{upper}] = []"]
 
         else:
-            try:
-                s = self._stk[lower:upper]
-                assert bool(s) == bool(self._stk), \
-                    (
-                        pmlr.util.debug_fmt("FATAL")
-                        + " pick returned result inconsistent with stack state"
-                    )
+            code = [
+                "[{lower}:{upper}];assert bool(s)==bool(self._stk),(pmlr.util.debug_fmt(\"FATAL\")+\" pick returned result inconsistent with stack state\")",
+                "[{lower}:{upper}] = []"
+            ]
 
-            # special cases of these exceptions: we want to rethrow
-            # because they should be exceptional circumstances
-            except LookupError as err:
-                self.err(err, errtype="RANGE")
-                raise
-                return None
+        code = [c.format(lower=lower, upper=upper) for c in code]
 
-            except AssertionError as err:
-                self.err(err, errtype="FATAL")
-                raise
-                return None
-            else:
-                return s[0] if len(s) == 1 else s
+        res = self._pick_deduplicator(code, drop=drop)
+
+        try:
+            return res
+        except IndexError as err:
+            self.err(err, errtype="RANGE")
+            raise
 
     def drop(self, count=1, idx=-1):
         """( x -- )
@@ -236,5 +262,5 @@ class Stack(OpCore, OpLogik, OpString):
             raise err.__class__(
                 pmlr.util.debug_fmt(
                     errtype, framelevel=framelevel
-                ) + " " + "".join(*err.args)
+                ) + " " + "".join([str(i) for i in err.args])
             )
