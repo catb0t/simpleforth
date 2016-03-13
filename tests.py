@@ -93,16 +93,25 @@ class TestCoreOps(unittest.TestCase):
         self.assertEqual(self.stk.pick(), 3)
 
     def test_pick_range_lower(self):
-        "get items from an index slice"
+        "get items from lower index slice"
         self.assertEqual(self.stk.pick(lower=1), [2, 3])
 
-    #def test_pick_range_upper(self):
+    def test_pick_range_upper(self):
+        "get items from upper index slice"
+        self.assertEqual(self.stk.pick(upper=1), [1, 2])
+
+    def test_pick_range(self):
+        "get items from index slice"
+        self.assertEqual(self.stk.pick(upper=1, lower=1), [2])
 
 
-if __name__ == '__main__':
-
+def main():
     from sortUnittests import suiteFactory, caseFactory
     cases = suiteFactory(*caseFactory(scope = globals().copy()))
 
     runner = unittest.TextTestRunner(verbosity=2, failfast=True)
     runner.run(cases)
+
+
+if __name__ == '__main__':
+    main()

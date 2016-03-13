@@ -122,26 +122,6 @@ class OpCore():
         self._stk.clear()
         return y
 
-    def _pick_deduplicator(self, execStrings, drop=False):
-
-        code = "self._LASTPICK = self._stk{}\nif drop: self._stk{}"\
-        .format(*execStrings)
-
-        try:
-            exec(code, globals(), locals())
-
-        # special cases of these exceptions: we want to rethrow
-        # because they should be exceptional circumstances
-        except BaseException as err:
-            self.err(
-                err,
-                errtype = {
-                    LookupError: "RANGE",
-                    AssertionError: "FATAL"
-                }.get(err.__class__, "EXECFORMATERR")
-            )
-            raise
-
     def pick(self, lower=-1, upper=-1, drop=False):
         """( x -- x )
         pick somethings from a range of indicies"""
@@ -161,19 +141,38 @@ class OpCore():
 
         else:
             code = [
-                "[{lower}:{upper}];assert bool(s)==bool(self._stk),(pmlr.util.debug_fmt(\"FATAL\")+\" pick returned result inconsistent with stack state\")",
+                "[{lower}:{upper}]\nassert bool(self._LASTPICK)==bool(self._stk),(pmlr.util.debug_fmt('ASSERTION_FAILED\x07')+' Assertion Failed! `pick` returned result inconsistent with stack state: %s != %s' % (self._LASTPICK, self._stk));",
                 "[{lower}:{upper}] = []"
             ]
 
-        code = [c.format(lower=lower, upper=upper) for c in code]
+        run_strs = [c.format(lower=lower, upper=upper) for c in code]
 
-        self._pick_deduplicator(code, drop=drop)
+        code = "self._LASTPICK = self._stk{}\nif drop: self._stk{}"\
+        .format(*run_strs)
 
         try:
-            return self._LASTPICK
-        except IndexError as err:
-            self.err(err, errtype="RANGE")
+            exec(code, globals(), locals())
+            try:
+                s = self._LASTPICK.copy()
+                assert not (s is self._LASTPICK), "didn't properly un-reference instance var"
+            except AttributeError:
+                s = self._LASTPICK
+            del self._LASTPICK
+            return s
+        # special cases of these exceptions: we want to rethrow
+        # because they should be exceptional circumstances
+
+        except BaseException as err:
+            self.err(
+                err,
+                errtype = {
+                    LookupError:    "RANGE",
+                    AssertionError: "FATAL",
+                    NameError:      "FATAL",
+                }.get(err.__class__, "EXEC_FORMAT_ERR")
+            )
             raise
+
 
     def drop(self, count=1, idx=-1):
         """( x -- )
@@ -254,3 +253,39 @@ class Stack(OpCore, OpLogik, OpString):
                     errtype, framelevel=framelevel
                 ) + " " + "".join([str(i) for i in err.args])
             )
+
+    def __repr__(self):
+        return "<{}> {}".format(len(self._stk), _fmt_collection(self._stk))
+
+is_collection = lambda c: any(issubclass(c, (list, tuple, dict, set)), isinstance(c, (list, tuple, dict, set)))
+
+def _fmt_collection(col):
+    "format a collection literal"
+    t_super = col.__class__
+    try:
+        t_mro  = t_super.mro()
+        t_meta = t_mro[1]
+        if cmp_all(type(t_meta), object, type, type(object), type(type)): raise TypeError
+    except (NameError, TypeError, IndexError, AttributeError) as err:
+        if cmp_all(err.__class__, NameError, AttributeError) and not hasattr(t_super, "mro"): raise
+        else: raise TypeError("need object instance but found {} (class constructor, type or object object)".format(type(col)))
+
+    is_iter      = hasattr(col, "__iter__")
+    is_meta_iter = hasattr(col.__class__, "__iter__")
+    if not any(is_iter, is_meta_iter):
+        raise TypeError("({}) {} object is not iterable".format(col, col.__class__))
+
+    orderedary = (list, tuple, set)
+    if any(isinstance(col, orderedary), issubclass(col, orderedary)):
+        return " ".join(str(i) if not is_collection(i) else _fmt_collection(i) for i in col)
+
+    elif any(isinstance(col, dict), issubclass(col, dict)):
+        return " ".join("{}:{}".format(key, value) for key, value in col.items())
+    else:
+        raise TypeError("don't know how to format that container")
+
+    return locals()
+
+if __name__ == "__main__":
+    from tests import main as test_main
+    test_main()
