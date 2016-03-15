@@ -122,57 +122,16 @@ class OpCore():
         self._stk.clear()
         return y
 
-    def pick(self, lower=-1, upper=-1, drop=False):
+    def pick(self, idx=-1, lower=None, upper=None, drop=False):
         """( x -- x )
         pick somethings from a range of indicies"""
 
-        if cmp_all(-1, lower, upper) or all(lower == -1, upper == 0):
-            code = ["[-1]", "[-1:] = []"]
+        if cmp_all(None, lower, upper):
+            s = self._stk[idx]
+            if drop: self._stk[idx] = []
 
-        # "string"[0:-1] == "strin"
-        elif all(lower == 0, upper == -1):
-            code = ["[:]", " = []"]
-
-        elif upper == -1:
-            code = ["[{lower}:]", "[{lower}:] = []"]
-
-        elif lower == 0:
-            code = ["[:{upper}]", "[:{upper}] = []"]
-
-        else:
-            code = [
-                "[{lower}:{upper}]\nassert bool(self._LASTPICK)==bool(self._stk),(pmlr.util.debug_fmt('ASSERTION_FAILED\x07')+' Assertion Failed! `pick` returned result inconsistent with stack state: %s != %s' % (self._LASTPICK, self._stk));",
-                "[{lower}:{upper}] = []"
-            ]
-
-        run_strs = [c.format(lower=lower, upper=upper) for c in code]
-
-        code = "self._LASTPICK = self._stk{}\nif drop: self._stk{}"\
-        .format(*run_strs)
-
-        try:
-            exec(code, globals(), locals())
-            try:
-                s = self._LASTPICK.copy()
-                assert not (s is self._LASTPICK), "didn't properly un-reference instance var"
-            except AttributeError:
-                s = self._LASTPICK
-            del self._LASTPICK
-            return s
-        # special cases of these exceptions: we want to rethrow
-        # because they should be exceptional circumstances
-
-        except BaseException as err:
-            self.err(
-                err,
-                errtype = {
-                    LookupError:    "RANGE",
-                    AssertionError: "FATAL",
-                    NameError:      "FATAL",
-                }.get(err.__class__, "EXEC_FORMAT_ERR")
-            )
-            raise
-
+        elif all(lower is None, upper is not None):
+            pass
 
     def drop(self, count=1, idx=-1):
         """( x -- )
@@ -257,7 +216,7 @@ class Stack(OpCore, OpLogik, OpString):
     def __repr__(self):
         return "<{}> {}".format(len(self._stk), _fmt_collection(self._stk))
 
-is_collection = lambda c: any(issubclass(c, (list, tuple, dict, set)), isinstance(c, (list, tuple, dict, set)))
+is_collection = lambda c: any(issubclass(c.__class__, (list, tuple, dict, set)), isinstance(c, (list, tuple, dict, set)))
 
 def _fmt_collection(col):
     "format a collection literal"
@@ -276,11 +235,11 @@ def _fmt_collection(col):
         raise TypeError("({}) {} object is not iterable".format(col, col.__class__))
 
     orderedary = (list, tuple, set)
-    if any(isinstance(col, orderedary), issubclass(col, orderedary)):
-        return " ".join(str(i) if not is_collection(i) else _fmt_collection(i) for i in col)
+    if any(isinstance(col, orderedary), issubclass(col.__class__, orderedary)):
+        return "[ {} ]".format(" ".join(repr(i) if not is_collection(i) else _fmt_collection(i) for i in col))
 
     elif any(isinstance(col, dict), issubclass(col, dict)):
-        return " ".join("{}:{}".format(key, value) for key, value in col.items())
+        return " ".join("{}:{}".format(str(key), str(value)) for key, value in col.items())
     else:
         raise TypeError("don't know how to format that container")
 
