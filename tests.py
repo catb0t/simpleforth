@@ -90,19 +90,11 @@ class TestCoreOps(unittest.TestCase):
 
     def test_pick(self):
         "get an item from an index"
-        self.assertEqual(self.stk.pick(), 3)
+        self.assertEqual(self.stk.pick(), 1)
 
-    def test_pick_range_lower(self):
-        "get items from lower index slice"
-        self.assertEqual(self.stk.pick(lower=1), [2, 3])
-
-    def test_pick_range_upper(self):
-        "get items from upper index slice"
-        self.assertEqual(self.stk.pick(upper=1), [1, 2])
-
-    def test_pick_range(self):
-        "get items from index slice"
-        self.assertEqual(self.stk.pick(upper=1, lower=1), [2])
+    def test_pick_idx(self):
+        "get an item from a given index"
+        self.assertEqual(self.stk.pick(-2), 2)
 
 
 def main():

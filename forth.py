@@ -122,16 +122,13 @@ class OpCore():
         self._stk.clear()
         return y
 
-    def pick(self, idx=-1, lower=None, upper=None, drop=False):
+    def pick(self, idx=-3, drop=False):
         """( x -- x )
         pick somethings from a range of indicies"""
+        s = self._stk[idx]
+        if drop: self._stk[idx] = []
 
-        if cmp_all(None, lower, upper):
-            s = self._stk[idx]
-            if drop: self._stk[idx] = []
-
-        elif all(lower is None, upper is not None):
-            pass
+        return s
 
     def drop(self, count=1, idx=-1):
         """( x -- )
